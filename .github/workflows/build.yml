@@ -14,8 +14,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build OmniStore
+  core:
+    name: Core tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out OmniStore
+        uses: actions/checkout@v4
+
+      - name: Check out local package dependencies
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/lekhanh9/ghost-code.git "$GITHUB_WORKSPACE/../ghost-code"
+          git clone --depth 1 https://github.com/lekhanh9/ghost-sign.git "$GITHUB_WORKSPACE/../ghost-sign"
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Run core tests
+        run: swift test
+
+  ios:
+    name: Build iOS app
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -32,9 +52,6 @@ jobs:
         run: |
           swift --version
           xcodebuild -version
-
-      - name: Run core tests
-        run: swift test
 
       - name: Resolve Xcode packages
         run: |
