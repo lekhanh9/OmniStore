@@ -136,12 +136,28 @@ public actor MinimuxerWrapper {
         let core = Minimuxer.shared.core
         await bindLocalVPN(core: core)
 
+        let mountPath = configuration.mountPath.path
         do {
-            try await core.start(
-                pairingFile: pairingContents,
-                mountPath: configuration.mountPath.path,
-                preferred: preferred.minimuxerProtocol
-            )
+            switch preferred {
+            case .automatic:
+                try await core.start(
+                    pairingFile: pairingContents,
+                    mountPath: mountPath,
+                    preferred: nil
+                )
+            case .lockdown:
+                try await core.start(
+                    pairingFile: pairingContents,
+                    mountPath: mountPath,
+                    preferred: .lockdown
+                )
+            case .rppairing:
+                try await core.start(
+                    pairingFile: pairingContents,
+                    mountPath: mountPath,
+                    preferred: .rppairing
+                )
+            }
         } catch {
             throw MinimuxerWrapperError.operationFailed(operationMessage(error, core: core))
         }
@@ -301,17 +317,3 @@ public actor MinimuxerWrapper {
     }
 }
 
-#if canImport(Minimuxer) && os(iOS)
-private extension PairingMode {
-    var minimuxerProtocol: PairingProtocol? {
-        switch self {
-        case .automatic:
-            return nil
-        case .lockdown:
-            return .lockdown
-        case .rppairing:
-            return .rppairing
-        }
-    }
-}
-#endif
