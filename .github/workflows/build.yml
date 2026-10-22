@@ -104,7 +104,7 @@ jobs:
           REF_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+          if [[ -n "$INPUT_TAG" ]]; then
             TAG="$INPUT_TAG"
           elif [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
             TAG="latest"
