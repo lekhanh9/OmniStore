@@ -232,6 +232,7 @@ public actor MinimuxerWrapper {
 
     public func removeApp(bundleIdentifier: String) async throws {
         #if canImport(Minimuxer) && os(iOS)
+        try await start()
         guard isStarted else { throw MinimuxerWrapperError.notStarted }
         let core = Minimuxer.shared.core
         do {

@@ -126,6 +126,10 @@ public actor InstallationManager {
         await progress(.installing(0.97, "Finishing installation…"))
     }
 
+    public func uninstallOnDevice(bundleIdentifier: String) async throws {
+        try await minimuxer.removeApp(bundleIdentifier: bundleIdentifier)
+    }
+
     public func discard(_ prepared: PreparedInstallation) async {
         await ipaService.discard(workspace: prepared.workspaceURL)
         let signedIPAURL = prepared.signedIPAURL

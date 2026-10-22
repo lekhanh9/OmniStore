@@ -70,7 +70,11 @@ struct LibraryView: View {
             case .uninstall(let app):
                 return Alert(
                     title: Text("Uninstall \(app.name)?"),
-                    message: Text("This removes the app from your OmniStore library. The mock installer does not modify apps installed on your Home Screen."),
+                    message: Text(
+                        installManager.installerIsMock
+                            ? "This removes the app from your OmniStore library. The mock installer does not modify apps installed on your Home Screen."
+                            : "This uninstalls the app from this device and removes it from your OmniStore library."
+                    ),
                     primaryButton: .destructive(Text("Uninstall")) {
                         installManager.uninstall(app)
                     },

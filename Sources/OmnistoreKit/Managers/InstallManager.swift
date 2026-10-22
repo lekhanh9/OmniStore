@@ -115,7 +115,13 @@ public final class InstallManager: ObservableObject {
             defer { self.uninstallingBundleIdentifier = nil }
 
             do {
-                try await self.mockInstaller.uninstallApp(bundleIdentifier: app.bundleIdentifier)
+                if self.deviceInstallAvailable {
+                    try await self.installationManager.uninstallOnDevice(
+                        bundleIdentifier: app.bundleIdentifier
+                    )
+                } else {
+                    try await self.mockInstaller.uninstallApp(bundleIdentifier: app.bundleIdentifier)
+                }
                 let apps = try await self.libraryStore.remove(bundleIdentifier: app.bundleIdentifier)
                 self.installedApps = apps
 
