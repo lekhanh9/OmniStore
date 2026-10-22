@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import OmnistoreKit
 
 enum OmniTheme {
     static let canvas = Color(red: 0.030, green: 0.036, blue: 0.052)
