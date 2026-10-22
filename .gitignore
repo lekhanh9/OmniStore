@@ -1,0 +1,26 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode
+DerivedData/
+*.xcuserstate
+**/xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
+
+# Signing material and build artifacts
+*.p12
+*.cer
+*.mobileprovision
+*.ipa
+Config/*.xcconfig
+*.xcarchive
+
+# Local tooling
+.env
+.vscode/
+.idea/
