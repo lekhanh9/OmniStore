@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build OmniStore
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out OmniStore
+        uses: actions/checkout@v4
+
+      - name: Check out local package dependencies
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/lekhanh9/ghost-code.git "$GITHUB_WORKSPACE/../ghost-code"
+          git clone --depth 1 https://github.com/lekhanh9/ghost-sign.git "$GITHUB_WORKSPACE/../ghost-sign"
+
+      - name: Show tool versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Run core tests
+        run: swift test
+
+      - name: Resolve Xcode packages
+        run: |
+          xcodebuild \
+            -project OmniStore.xcodeproj \
+            -scheme OmniStore \
+            -resolvePackageDependencies
+
+      - name: Build iOS app
+        run: |
+          xcodebuild \
+            -project OmniStore.xcodeproj \
+            -scheme OmniStore \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
