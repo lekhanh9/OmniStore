@@ -20,7 +20,8 @@ public actor LibraryStore {
 
     public nonisolated static func defaultBaseDirectory() -> URL {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents", isDirectory: true)
+            ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+                .appendingPathComponent("Documents", isDirectory: true)
         return documentsURL
             .appendingPathComponent(OmnistoreConstants.rootDirectoryName, isDirectory: true)
             .appendingPathComponent(OmnistoreConstants.libraryDirectoryName, isDirectory: true)

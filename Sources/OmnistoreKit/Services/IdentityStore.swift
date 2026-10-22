@@ -28,7 +28,8 @@ public actor IdentityStore {
     public nonisolated static func defaultBaseDirectory() -> URL {
         let fileManager = FileManager.default
         let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
-            ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Documents", isDirectory: true)
+            ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+                .appendingPathComponent("Documents", isDirectory: true)
         return documentsURL.appendingPathComponent(OmnistoreConstants.rootDirectoryName, isDirectory: true)
     }
 
