@@ -20,7 +20,6 @@ public final class AuthManager: ObservableObject {
     @Published public var appleID: String
     @Published public var password: String = ""
     @Published public var twoFactorCode: String = ""
-    @Published public var anisetteServerURL: String
     @Published public var deviceUDID: String
 
     @Published public private(set) var teams: [AppleTeamSummary] = []
@@ -39,23 +38,23 @@ public final class AuthManager: ObservableObject {
     }
 
     private let identityStore: IdentityStore
+    private let settings: AppSettings
     private let defaults: UserDefaults
 
     private var session: AuthSession?
-    private var portalClient: DeveloperPortalClient?
     private var pendingTwoFactor: TwoFactorContext?
 
     // MARK: - Lifecycle
 
     public init(
         identityStore: IdentityStore = IdentityStore(),
+        settings: AppSettings,
         defaults: UserDefaults = .standard
     ) {
         self.identityStore = identityStore
+        self.settings = settings
         self.defaults = defaults
         self.appleID = defaults.string(forKey: OmnistoreConstants.Preferences.appleID) ?? ""
-        self.anisetteServerURL = defaults.string(forKey: OmnistoreConstants.Preferences.anisetteServer)
-            ?? OmnistoreConstants.defaultAnisetteServer
         self.deviceUDID = defaults.string(forKey: OmnistoreConstants.Preferences.deviceUDID) ?? ""
         self.selectedTeamID = defaults.string(forKey: OmnistoreConstants.Preferences.selectedTeamID)
 
@@ -106,7 +105,12 @@ public final class AuthManager: ObservableObject {
         let secret = password
 
         do {
-            let auth = AppleAuth(anisetteProvider: RemoteAnisetteProvider(serverURL: serverURL))
+            let auth = AppleAuth(
+                anisetteProvider: RemoteAnisetteProvider(
+                    serverURL: serverURL,
+                    clientConfiguration: settings.clientConfiguration
+                )
+            )
             let result = try await auth.startLogin(appleID: normalizedID, password: secret)
 
             switch result {
@@ -146,7 +150,12 @@ public final class AuthManager: ObservableObject {
         phase = .verifyingTwoFactor
 
         do {
-            let auth = AppleAuth(anisetteProvider: RemoteAnisetteProvider(serverURL: serverURL))
+            let auth = AppleAuth(
+                anisetteProvider: RemoteAnisetteProvider(
+                    serverURL: serverURL,
+                    clientConfiguration: settings.clientConfiguration
+                )
+            )
             let session = try await auth.submit2FACode(code: code, context: context)
             pendingTwoFactor = nil
             twoFactorCode = ""
@@ -167,7 +176,6 @@ public final class AuthManager: ObservableObject {
 
     public func signOut() {
         session = nil
-        portalClient = nil
         pendingTwoFactor = nil
         teams = []
         account = nil
@@ -188,7 +196,6 @@ public final class AuthManager: ObservableObject {
 
     public func savePreferences() {
         defaults.set(appleID.trimmingCharacters(in: .whitespacesAndNewlines), forKey: OmnistoreConstants.Preferences.appleID)
-        defaults.set(anisetteServerURL.trimmingCharacters(in: .whitespacesAndNewlines), forKey: OmnistoreConstants.Preferences.anisetteServer)
         defaults.set(deviceUDID.trimmingCharacters(in: .whitespacesAndNewlines), forKey: OmnistoreConstants.Preferences.deviceUDID)
         if let selectedTeamID {
             defaults.set(selectedTeamID, forKey: OmnistoreConstants.Preferences.selectedTeamID)
@@ -203,8 +210,10 @@ public final class AuthManager: ObservableObject {
 
     private func completeSignIn(session: AuthSession) async {
         self.session = session
-        let client = DeveloperPortalClient(session: session)
-        portalClient = client
+        let client = DeveloperPortalClient(
+            session: session,
+            clientConfiguration: settings.clientConfiguration
+        )
 
         do {
             let fetchedTeams = try await client.listTeams()
@@ -257,7 +266,6 @@ public final class AuthManager: ObservableObject {
     private func failSignIn(_ reason: String) {
         lastError = reason
         session = nil
-        portalClient = nil
         pendingTwoFactor = nil
         phase = .signedOut
         password = ""
@@ -298,12 +306,16 @@ public final class AuthManager: ObservableObject {
     }
 
     public func prepareCertificate() async {
-        guard phase == .signedIn, let client = portalClient, let team = selectedTeam else {
+        guard phase == .signedIn, let session, let team = selectedTeam else {
             lastError = "Sign in to your Apple ID before preparing a signing certificate."
             return
         }
         guard certificatePreparation != .preparing else { return }
 
+        let client = DeveloperPortalClient(
+            session: session,
+            clientConfiguration: settings.clientConfiguration
+        )
         lastError = nil
         certificatePreparation = .preparing
 
@@ -382,13 +394,18 @@ public final class AuthManager: ObservableObject {
         appName: String,
         deviceUDID: String
     ) async throws -> SigningAssets {
-        guard phase == .signedIn, let client = portalClient, let team = selectedTeam else {
+        guard phase == .signedIn, let session, let team = selectedTeam else {
             throw OmnistoreError.authentication("Sign in to your Apple ID before installing a signed app.")
         }
-        if session?.isExpired == true {
+        if session.isExpired {
             signOut()
             throw OmnistoreError.authentication("Your Apple ID session expired. Sign in again.")
         }
+
+        let client = DeveloperPortalClient(
+            session: session,
+            clientConfiguration: settings.clientConfiguration
+        )
 
         let trimmedUDID = deviceUDID.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedUDID = try Self.validateUDID(trimmedUDID)
@@ -508,12 +525,8 @@ public final class AuthManager: ObservableObject {
     // MARK: - Helpers
 
     private func validatedAnisetteURL() -> URL? {
-        let trimmed = anisetteServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed),
-              url.scheme?.lowercased() == "https",
-              let host = url.host,
-              !host.isEmpty else {
-            lastError = "Enter a valid HTTPS Anisette server URL."
+        guard let url = settings.validatedAnisetteServerURL else {
+            lastError = "Enter a valid HTTPS Anisette server URL in Settings."
             return nil
         }
         return url

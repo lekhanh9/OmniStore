@@ -61,7 +61,7 @@ struct LibraryView: View {
         }
         .fileImporter(
             isPresented: $isImporterPresented,
-            allowedContentTypes: [UTType.data]
+            allowedContentTypes: [.ipa]
         ) { result in
             handleImport(result)
         }
@@ -278,10 +278,33 @@ struct LibraryView: View {
     private func handleImport(_ result: Result<URL, Error>) {
         switch result {
         case .success(let url):
+            let hasAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            do {
+                try IPAFileValidator.validate(url)
+            } catch {
+                activeAlert = .importFailure(importErrorMessage(error))
+                return
+            }
+
             installManager.install(ipaURL: url)
         case .failure(let error):
             activeAlert = .importFailure(error.localizedDescription)
         }
+    }
+
+    private func importErrorMessage(_ error: Error) -> String {
+        if let localized = error as? LocalizedError,
+           let description = localized.errorDescription,
+           !description.isEmpty {
+            return description
+        }
+        return error.localizedDescription
     }
 }
 

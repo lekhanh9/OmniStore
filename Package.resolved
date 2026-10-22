@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "remotepairingkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mahee96/RemotePairingKit.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "e3f70d16c0c551540a533a39d540e78e5b0a60a8"
+      }
+    },
+    {
       "identity" : "swift-asn1",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",

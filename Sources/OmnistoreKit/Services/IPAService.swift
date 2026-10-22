@@ -23,6 +23,8 @@ public actor IPAService {
 
     /// Validates the archive, extracts it, and locates the single `.app` payload.
     public func prepare(ipaURL: URL, workspaceRoot: URL? = nil) throws -> PreparedIPA {
+        try IPAFileValidator.validate(ipaURL)
+
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: ipaURL.path) else {
             throw OmnistoreError.invalidIPA("The selected file no longer exists.")

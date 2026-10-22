@@ -3,7 +3,7 @@
 //  OmnistoreKit
 //
 //  ObservableObject that drives the full install pipeline:
-//  unzip IPA -> provision -> GhostCode sign -> repackage -> MockInstaller.
+//  unzip IPA -> provision -> GhostCode sign -> repackage -> minimuxer or mock.
 //
 
 #if canImport(Combine)
@@ -21,6 +21,7 @@ public final class InstallManager: ObservableObject {
     @Published public private(set) var hasLoadedLibrary = false
     @Published public private(set) var libraryErrorMessage: String?
     @Published public private(set) var uninstallingBundleIdentifier: String?
+    @Published public private(set) var deviceInstallAvailable = false
 
     @Published public var simulatedInstallDelay: TimeInterval {
         didSet {
@@ -38,8 +39,7 @@ public final class InstallManager: ObservableObject {
 
     private let authManager: AuthManager
     private let libraryStore: LibraryStore
-    private let ipaService: IPAService
-    private let signingService: SigningService
+    private let installationManager: InstallationManager
     private let mockInstaller: MockInstaller
     private let defaults: UserDefaults
 
@@ -50,15 +50,13 @@ public final class InstallManager: ObservableObject {
     public init(
         authManager: AuthManager,
         libraryStore: LibraryStore = LibraryStore(),
-        ipaService: IPAService = IPAService(),
-        signingService: SigningService = SigningService(),
+        installationManager: InstallationManager = InstallationManager(),
         mockInstaller: MockInstaller = MockInstaller(),
         defaults: UserDefaults = .standard
     ) {
         self.authManager = authManager
         self.libraryStore = libraryStore
-        self.ipaService = ipaService
-        self.signingService = signingService
+        self.installationManager = installationManager
         self.mockInstaller = mockInstaller
         self.defaults = defaults
 
@@ -70,14 +68,16 @@ public final class InstallManager: ObservableObject {
         applyMockConfiguration()
 
         Task { [weak self] in
-            await self?.reloadLibrary()
+            guard let self else { return }
+            await self.refreshDeviceInstallAvailability()
+            await self.reloadLibrary()
         }
     }
 
     // MARK: - Derived State
 
     public var installerIsMock: Bool {
-        mockInstaller.isMock
+        !deviceInstallAvailable
     }
 
     public var isActivityVisible: Bool {
@@ -134,6 +134,10 @@ public final class InstallManager: ObservableObject {
         libraryErrorMessage = nil
     }
 
+    public func refreshDeviceInstallAvailability() async {
+        deviceInstallAvailable = await installationManager.canInstallOnDevice()
+    }
+
     // MARK: - Installation
 
     public func install(ipaURL: URL) {
@@ -169,64 +173,54 @@ public final class InstallManager: ObservableObject {
     }
 
     private func runInstall(ipaURL: URL) async {
-        var workspaceURL: URL?
-        var temporaryIPAURL: URL?
+        var preparedInstallation: InstallationManager.PreparedInstallation?
         var savedIconURL: URL?
 
         do {
-            progress = .preparing(0.06, "Validating and unpacking the archive…")
-            let prepared = try await ipaService.prepare(ipaURL: ipaURL)
-            workspaceURL = prepared.workspaceURL
+            let authManager = self.authManager
+            let installationManager = self.installationManager
+            let assetsProvider: InstallationManager.AssetsProvider = { metadata in
+                guard authManager.isSignedIn else { return nil }
+                return try await authManager.signingAssets(
+                    bundleIdentifier: metadata.bundleIdentifier,
+                    appName: metadata.name,
+                    deviceUDID: authManager.deviceUDID
+                )
+            }
+            let progressHandler: InstallationManager.ProgressHandler = { [weak self] update in
+                self?.progress = update
+            }
+
+            let prepared = try await installationManager.prepare(
+                ipaURL: ipaURL,
+                assetsProvider: assetsProvider,
+                progress: progressHandler
+            )
+            preparedInstallation = prepared
             activeAppName = prepared.metadata.name
 
             try Task.checkCancellation()
-            progress = .preparing(
-                0.18,
-                "Found \(prepared.metadata.name) \(prepared.metadata.version)"
-            )
+            await refreshDeviceInstallAvailability()
 
-            let assets: SigningAssets?
-            if authManager.isSignedIn {
-                progress = .provisioning(0.28, "Requesting Apple certificate and provisioning profile…")
-                assets = try await authManager.signingAssets(
-                    bundleIdentifier: prepared.metadata.bundleIdentifier,
-                    appName: prepared.metadata.name,
-                    deviceUDID: authManager.deviceUDID
+            if deviceInstallAvailable {
+                try await installationManager.installOnDevice(
+                    prepared,
+                    progress: progressHandler
                 )
             } else {
-                progress = .provisioning(0.28, "No Apple ID session. Using a demo (ad-hoc) signature…")
-                assets = nil
-            }
-
-            try Task.checkCancellation()
-            progress = .signing(0.45, "Signing Mach-O binaries and sealing resources…")
-
-            let appBundleURL = prepared.appBundleURL
-            let assetsToSign = assets
-            let signer = signingService
-            try await Task.detached(priority: .userInitiated) {
-                try signer.sign(appBundleURL: appBundleURL, assets: assetsToSign)
-            }.value
-
-            try Task.checkCancellation()
-            progress = .packaging(0.65, "Repackaging the signed application…")
-
-            let outputURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("OmniStore-signed-\(UUID().uuidString).ipa")
-            temporaryIPAURL = outputURL
-            try await ipaService.package(appBundleURL: appBundleURL, to: outputURL)
-
-            try Task.checkCancellation()
-            progress = .installing(0.75, "Sending the signed app to the device gateway…")
-
-            try await mockInstaller.installApp(ipaURL: outputURL) { [weak self] fraction in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    let mapped = 0.75 + (min(max(fraction, 0), 1) * 0.22)
-                    self.progress = .installing(
-                        mapped,
-                        "Mock installer progress \(Int(fraction * 100))%"
-                    )
+                progress = .installing(
+                    0.75,
+                    "No device gateway configured. Running the mock installer…"
+                )
+                try await mockInstaller.installApp(ipaURL: prepared.signedIPAURL) { [weak self] fraction in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        let mapped = 0.75 + (min(max(fraction, 0), 1) * 0.22)
+                        self.progress = .installing(
+                            mapped,
+                            "Mock installer progress \(Int(fraction * 100))%"
+                        )
+                    }
                 }
             }
 
@@ -245,7 +239,7 @@ public final class InstallManager: ObservableObject {
 
             let now = Date()
             let fallbackExpiration = now.addingTimeInterval(OmnistoreConstants.freeCertificateValidity)
-            let profileExpiration = assets?.provisioningProfileExpiration
+            let profileExpiration = prepared.provisioningProfileExpiration
             let expiration = (profileExpiration ?? fallbackExpiration) > now
                 ? (profileExpiration ?? fallbackExpiration)
                 : fallbackExpiration
@@ -254,12 +248,12 @@ public final class InstallManager: ObservableObject {
                 bundleIdentifier: prepared.metadata.bundleIdentifier,
                 name: prepared.metadata.name,
                 version: prepared.metadata.version,
-                developerName: assets == nil ? "OmniStore Demo" : "Apple Development",
+                developerName: prepared.isAdHocSigned ? "OmniStore Demo" : "Apple Development",
                 installedDate: now,
                 expirationDate: expiration,
                 iconURL: savedIconURL,
                 iconSystemName: savedIconURL == nil ? "shippingbox.fill" : nil,
-                certificateId: assets?.certificateID,
+                certificateId: prepared.certificateID,
                 originalIPAFileName: ipaURL.lastPathComponent
             )
 
@@ -267,9 +261,11 @@ public final class InstallManager: ObservableObject {
             installedApps = apps
             hasLoadedLibrary = true
 
-            let mode = assets == nil ? " (demo install)" : ""
+            let mode = prepared.isAdHocSigned
+                ? " (demo install)"
+                : (deviceInstallAvailable ? "" : " (simulated)")
             progress = .completed("\(installedApp.name) installed successfully\(mode).")
-            await cleanup(workspace: workspaceURL, temporaryIPA: temporaryIPAURL)
+            await installationManager.discard(prepared)
         } catch {
             if Task.isCancelled || error is CancellationError {
                 progress = .failed("Installation was cancelled.")
@@ -284,21 +280,8 @@ public final class InstallManager: ObservableObject {
                     // The install failure is the actionable error; icon cleanup is best-effort.
                 }
             }
-            await cleanup(workspace: workspaceURL, temporaryIPA: temporaryIPAURL)
-        }
-    }
-
-    private func cleanup(workspace: URL?, temporaryIPA: URL?) async {
-        if let workspace {
-            await ipaService.discard(workspace: workspace)
-        }
-        if let temporaryIPA {
-            let fileManager = FileManager.default
-            guard fileManager.fileExists(atPath: temporaryIPA.path) else { return }
-            do {
-                try fileManager.removeItem(at: temporaryIPA)
-            } catch {
-                // Temporary files are cleaned by the OS if this fails.
+            if let preparedInstallation {
+                await installationManager.discard(preparedInstallation)
             }
         }
     }

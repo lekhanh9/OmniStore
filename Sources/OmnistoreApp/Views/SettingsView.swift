@@ -90,6 +90,7 @@ struct SettingsView: View {
 
 private struct AccountSection: View {
     @EnvironmentObject private var auth: AuthManager
+    @EnvironmentObject private var settings: AppSettings
     let onRequestSignOut: () -> Void
 
     @State private var isAdvancedExpanded = false
@@ -247,17 +248,7 @@ private struct AccountSection: View {
 
             DisclosureGroup(isExpanded: $isAdvancedExpanded) {
                 VStack(alignment: .leading, spacing: 13) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SettingsFieldLabel(text: "ANISETTE SERVER")
-                        TextField(OmnistoreConstants.defaultAnisetteServer, text: $auth.anisetteServerURL)
-                            .textFieldStyle(.plain)
-                            .keyboardType(.URL)
-                            .textContentType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .omniField()
-                    }
-
+                    spoofingFields
                     deviceUDIDField
                 }
                 .padding(.top, 12)
@@ -322,17 +313,64 @@ private struct AccountSection: View {
             deviceUDIDField
 
             if auth.isSignedIn {
-                VStack(alignment: .leading, spacing: 6) {
-                    SettingsFieldLabel(text: "ANISETTE SERVER")
-                    TextField(OmnistoreConstants.defaultAnisetteServer, text: $auth.anisetteServerURL)
-                        .textFieldStyle(.plain)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .omniField()
-                }
+                spoofingFields
             }
+        }
+    }
+
+    private var spoofingFields: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            VStack(alignment: .leading, spacing: 6) {
+                SettingsFieldLabel(text: "ANISETTE SERVER")
+                TextField(OmnistoreConstants.defaultAnisetteServer, text: $settings.anisetteServerURL)
+                    .textFieldStyle(.plain)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .omniField()
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    SettingsFieldLabel(text: "USER-AGENT")
+                    Spacer()
+                    Button("Use Default") {
+                        settings.userAgent = ""
+                    }
+                    .font(OmniTypography.label(10))
+                    .foregroundColor(OmniTheme.accent)
+                    .buttonStyle(.plain)
+                }
+                TextField(AppSettings.defaultUserAgent, text: $settings.userAgent)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .omniField()
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    SettingsFieldLabel(text: "CLIENT-INFO")
+                    Spacer()
+                    Button("Use Default") {
+                        settings.clientInfo = ""
+                    }
+                    .font(OmniTypography.label(10))
+                    .foregroundColor(OmniTheme.accent)
+                    .buttonStyle(.plain)
+                }
+                TextField(AppSettings.defaultClientInfo, text: $settings.clientInfo)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .omniField()
+            }
+
+            Text("Blank values fall back to Apple’s defaults. These headers are sent to GrandSlam and the Developer Portal on every request.")
+                .font(OmniTypography.body(10))
+                .foregroundColor(OmniTheme.tertiaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -527,11 +565,17 @@ private struct CertificateSection: View {
 private struct InstallerSection: View {
     @EnvironmentObject private var installManager: InstallManager
 
+    private var isMock: Bool {
+        installManager.installerIsMock
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             OmniSectionHeader(
                 title: "Installer",
-                subtitle: "The handoff currently runs in simulation."
+                subtitle: isMock
+                    ? "Simulation is active until minimuxer can reach a paired device."
+                    : "Signed IPAs are handed directly to minimuxer."
             )
 
             GlassCard(cornerRadius: 22, padding: 17) {
@@ -539,85 +583,94 @@ private struct InstallerSection: View {
                     HStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .fill(OmniTheme.sky.opacity(0.12))
-                            Image(systemName: "testtube.2")
+                                .fill((isMock ? OmniTheme.sky : OmniTheme.accent).opacity(0.12))
+                            Image(systemName: isMock ? "testtube.2" : "bolt.horizontal.circle.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(OmniTheme.sky)
+                                .foregroundColor(isMock ? OmniTheme.sky : OmniTheme.accent)
                         }
                         .frame(width: 44, height: 44)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Mock Installer")
+                            Text(isMock ? "Mock Installer" : "Minimuxer")
                                 .font(OmniTypography.title(14))
                                 .foregroundColor(OmniTheme.primaryText)
-                            Text("Minimuxer bridge not connected yet.")
+                            Text(isMock
+                                ? "Add a pairing file to enable on-device installs."
+                                : "Connected through the local VPN gateway.")
                                 .font(OmniTypography.body(11))
                                 .foregroundColor(OmniTheme.secondaryText)
                         }
 
                         Spacer(minLength: 6)
 
-                        OmniPill(text: "Simulated", color: OmniTheme.sky)
-                    }
-
-                    Rectangle()
-                        .fill(OmniTheme.hairline)
-                        .frame(height: 1)
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack {
-                            SettingsFieldLabel(text: "INSTALL DELAY")
-                            Spacer()
-                            Text(OmniFormat.time(installManager.simulatedInstallDelay))
-                                .font(OmniTypography.mono(11))
-                                .foregroundColor(OmniTheme.secondaryText)
-                        }
-
-                        Slider(
-                            value: $installManager.simulatedInstallDelay,
-                            in: 0.2...5,
-                            step: 0.1
+                        OmniPill(
+                            text: isMock ? "Simulated" : "Ready",
+                            color: isMock ? OmniTheme.sky : OmniTheme.accent
                         )
-                        .accentColor(OmniTheme.accent)
-                        .disabled(installManager.isInstalling)
-
-                        HStack {
-                            Text("Snappy")
-                            Spacer()
-                            Text("Cinematic")
-                        }
-                        .font(OmniTypography.body(9))
-                        .foregroundColor(OmniTheme.tertiaryText)
                     }
 
-                    HStack(spacing: 11) {
-                        Image(systemName: "ladybug.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(OmniTheme.warm)
-                            .frame(width: 30, height: 30)
-                            .background(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(OmniTheme.warm.opacity(0.10))
+                    if isMock {
+                        Rectangle()
+                            .fill(OmniTheme.hairline)
+                            .frame(height: 1)
+
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack {
+                                SettingsFieldLabel(text: "INSTALL DELAY")
+                                Spacer()
+                                Text(OmniFormat.time(installManager.simulatedInstallDelay))
+                                    .font(OmniTypography.mono(11))
+                                    .foregroundColor(OmniTheme.secondaryText)
+                            }
+
+                            Slider(
+                                value: $installManager.simulatedInstallDelay,
+                                in: 0.2...5,
+                                step: 0.1
                             )
+                            .accentColor(OmniTheme.accent)
+                            .disabled(installManager.isInstalling)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Force install failure")
-                                .font(OmniTypography.label(12))
-                                .foregroundColor(OmniTheme.primaryText)
-                            Text("Exercise the error and retry states.")
-                                .font(OmniTypography.body(10))
-                                .foregroundColor(OmniTheme.tertiaryText)
+                            HStack {
+                                Text("Snappy")
+                                Spacer()
+                                Text("Cinematic")
+                            }
+                            .font(OmniTypography.body(9))
+                            .foregroundColor(OmniTheme.tertiaryText)
                         }
 
-                        Spacer()
+                        HStack(spacing: 11) {
+                            Image(systemName: "ladybug.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(OmniTheme.warm)
+                                .frame(width: 30, height: 30)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .fill(OmniTheme.warm.opacity(0.10))
+                                )
 
-                        Toggle("", isOn: $installManager.simulateInstallFailure)
-                            .labelsHidden()
-                            .toggleStyle(SwitchToggleStyle(tint: OmniTheme.warm))
-                            .disabled(installManager.isInstalling)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Force install failure")
+                                    .font(OmniTypography.label(12))
+                                    .foregroundColor(OmniTheme.primaryText)
+                                Text("Exercise the error and retry states.")
+                                    .font(OmniTypography.body(10))
+                                    .foregroundColor(OmniTheme.tertiaryText)
+                            }
+
+                            Spacer()
+
+                            Toggle("", isOn: $installManager.simulateInstallFailure)
+                                .labelsHidden()
+                                .toggleStyle(SwitchToggleStyle(tint: OmniTheme.warm))
+                                .disabled(installManager.isInstalling)
+                        }
                     }
 
-                    Text("When Minimuxer is bridged, this section will hand signed IPAs to the real installation gateway. Until then, every install is simulated after signing.")
+                    Text(isMock
+                        ? "Place a pairing file at Documents/Omnistore/Pairing/pairing.mobiledevicepairing to let minimuxer reach this device. Until then every install stops after signing and runs in simulation."
+                        : "Signed IPAs are copied to the device gateway and installed through MobileInstallation. Free developer certificates still expire after 7 days.")
                         .font(OmniTypography.body(10))
                         .foregroundColor(OmniTheme.tertiaryText)
                         .fixedSize(horizontal: false, vertical: true)

@@ -4,6 +4,7 @@ import PackageDescription
 var dependencies: [Package.Dependency] = [
     .package(path: "../ghost-code"),
     .package(path: "../ghost-sign"),
+    .package(path: "../minimuxer"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
 ]
@@ -19,6 +20,7 @@ var targets: [Target] = [
         dependencies: [
             .product(name: "GhostSign", package: "ghost-sign"),
             .product(name: "GhostCode", package: "ghost-code"),
+            .product(name: "Minimuxer", package: "minimuxer", condition: .when(platforms: [.iOS])),
             .product(name: "Crypto", package: "swift-crypto"),
             .product(name: "ZIPFoundation", package: "ZIPFoundation"),
         ],

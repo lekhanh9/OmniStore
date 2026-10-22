@@ -33,6 +33,7 @@ jobs:
           set -euo pipefail
           git clone --depth 1 https://github.com/lekhanh9/ghost-code.git "$GITHUB_WORKSPACE/../ghost-code"
           git clone --depth 1 https://github.com/lekhanh9/ghost-sign.git "$GITHUB_WORKSPACE/../ghost-sign"
+          git clone --depth 1 https://github.com/lekhanh9/minimuxer.git "$GITHUB_WORKSPACE/../minimuxer"
 
       - name: Show Swift version
         run: swift --version
@@ -53,6 +54,7 @@ jobs:
           set -euo pipefail
           git clone --depth 1 https://github.com/lekhanh9/ghost-code.git "$GITHUB_WORKSPACE/../ghost-code"
           git clone --depth 1 https://github.com/lekhanh9/ghost-sign.git "$GITHUB_WORKSPACE/../ghost-sign"
+          git clone --depth 1 https://github.com/lekhanh9/minimuxer.git "$GITHUB_WORKSPACE/../minimuxer"
 
       - name: Show tool versions
         run: |
@@ -72,7 +74,7 @@ jobs:
             -project OmniStore.xcodeproj \
             -scheme OmniStore \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -94,6 +96,7 @@ jobs:
           set -euo pipefail
           git clone --depth 1 https://github.com/lekhanh9/ghost-code.git "$GITHUB_WORKSPACE/../ghost-code"
           git clone --depth 1 https://github.com/lekhanh9/ghost-sign.git "$GITHUB_WORKSPACE/../ghost-sign"
+          git clone --depth 1 https://github.com/lekhanh9/minimuxer.git "$GITHUB_WORKSPACE/../minimuxer"
 
       - name: Resolve release tag
         env:
