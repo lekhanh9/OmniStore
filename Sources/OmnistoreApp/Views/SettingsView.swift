@@ -248,7 +248,6 @@ private struct AccountSection: View {
 
             DisclosureGroup(isExpanded: $isAdvancedExpanded) {
                 VStack(alignment: .leading, spacing: 13) {
-                    spoofingFields
                     deviceUDIDField
                 }
                 .padding(.top, 12)
@@ -312,13 +311,11 @@ private struct AccountSection: View {
 
             deviceUDIDField
 
-            if auth.isSignedIn {
-                spoofingFields
-            }
+            anisetteServerField
         }
     }
 
-    private var spoofingFields: some View {
+    private var anisetteServerField: some View {
         VStack(alignment: .leading, spacing: 13) {
             VStack(alignment: .leading, spacing: 6) {
                 SettingsFieldLabel(text: "ANISETTE SERVER")
@@ -331,43 +328,7 @@ private struct AccountSection: View {
                     .omniField()
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    SettingsFieldLabel(text: "USER-AGENT")
-                    Spacer()
-                    Button("Use Default") {
-                        settings.userAgent = ""
-                    }
-                    .font(OmniTypography.label(10))
-                    .foregroundColor(OmniTheme.accent)
-                    .buttonStyle(.plain)
-                }
-                TextField(AppSettings.defaultUserAgent, text: $settings.userAgent)
-                    .textFieldStyle(.plain)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .omniField()
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    SettingsFieldLabel(text: "CLIENT-INFO")
-                    Spacer()
-                    Button("Use Default") {
-                        settings.clientInfo = ""
-                    }
-                    .font(OmniTypography.label(10))
-                    .foregroundColor(OmniTheme.accent)
-                    .buttonStyle(.plain)
-                }
-                TextField(AppSettings.defaultClientInfo, text: $settings.clientInfo)
-                    .textFieldStyle(.plain)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .omniField()
-            }
-
-            Text("Blank values fall back to Apple’s defaults. These headers are sent to GrandSlam and the Developer Portal on every request.")
+            Text("All client identity headers are taken verbatim from this server's Anisette response and forwarded to Apple.")
                 .font(OmniTypography.body(10))
                 .foregroundColor(OmniTheme.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)

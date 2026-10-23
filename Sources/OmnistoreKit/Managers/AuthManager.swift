@@ -107,8 +107,7 @@ public final class AuthManager: ObservableObject {
         do {
             let auth = AppleAuth(
                 anisetteProvider: RemoteAnisetteProvider(
-                    serverURL: serverURL,
-                    clientConfiguration: settings.clientConfiguration
+                    serverURL: serverURL
                 )
             )
             let result = try await auth.startLogin(appleID: normalizedID, password: secret)
@@ -152,8 +151,7 @@ public final class AuthManager: ObservableObject {
         do {
             let auth = AppleAuth(
                 anisetteProvider: RemoteAnisetteProvider(
-                    serverURL: serverURL,
-                    clientConfiguration: settings.clientConfiguration
+                    serverURL: serverURL
                 )
             )
             let session = try await auth.submit2FACode(code: code, context: context)
@@ -211,8 +209,7 @@ public final class AuthManager: ObservableObject {
     private func completeSignIn(session: AuthSession) async {
         self.session = session
         let client = DeveloperPortalClient(
-            session: session,
-            clientConfiguration: settings.clientConfiguration
+            session: session
         )
 
         do {
@@ -313,8 +310,7 @@ public final class AuthManager: ObservableObject {
         guard certificatePreparation != .preparing else { return }
 
         let client = DeveloperPortalClient(
-            session: session,
-            clientConfiguration: settings.clientConfiguration
+            session: session
         )
         lastError = nil
         certificatePreparation = .preparing
@@ -403,8 +399,7 @@ public final class AuthManager: ObservableObject {
         }
 
         let client = DeveloperPortalClient(
-            session: session,
-            clientConfiguration: settings.clientConfiguration
+            session: session
         )
 
         let trimmedUDID = deviceUDID.trimmingCharacters(in: .whitespacesAndNewlines)

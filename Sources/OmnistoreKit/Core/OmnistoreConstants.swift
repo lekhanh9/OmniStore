@@ -31,8 +31,6 @@ public enum OmnistoreConstants {
     public enum Preferences {
         public static let appleID = "omnistore.appleID"
         public static let anisetteServer = "omnistore.anisetteServer"
-        public static let userAgent = "omnistore.userAgent"
-        public static let clientInfo = "omnistore.clientInfo"
         public static let selectedTeamID = "omnistore.selectedTeamID"
         public static let deviceUDID = "omnistore.deviceUDID"
         public static let mockInstallDelay = "omnistore.mockInstallDelay"

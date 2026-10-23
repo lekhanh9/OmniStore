@@ -2,43 +2,22 @@
 //  AppSettings.swift
 //  OmnistoreKit
 //
-//  User-configurable Anisette and Apple client identity settings,
-//  persisted in UserDefaults and injected into every Apple request.
+//  User-configurable Anisette server setting, persisted in UserDefaults.
+//  All Apple client identity headers are taken verbatim from the
+//  Anisette server response, so nothing is spoofed locally.
 //
 
 #if canImport(Combine)
 import Combine
 import Foundation
-import GhostSign
 
 @MainActor
 public final class AppSettings: ObservableObject {
-    public static let defaultUserAgent = AppleClientConfiguration.defaultUserAgent
-    public static let defaultClientInfo = AppleClientConfiguration.defaultClientInfo
-
     @Published public var anisetteServerURL: String {
         didSet {
             defaults.set(
                 anisetteServerURL.trimmingCharacters(in: .whitespacesAndNewlines),
                 forKey: OmnistoreConstants.Preferences.anisetteServer
-            )
-        }
-    }
-
-    @Published public var userAgent: String {
-        didSet {
-            defaults.set(
-                userAgent.trimmingCharacters(in: .whitespacesAndNewlines),
-                forKey: OmnistoreConstants.Preferences.userAgent
-            )
-        }
-    }
-
-    @Published public var clientInfo: String {
-        didSet {
-            defaults.set(
-                clientInfo.trimmingCharacters(in: .whitespacesAndNewlines),
-                forKey: OmnistoreConstants.Preferences.clientInfo
             )
         }
     }
@@ -49,13 +28,6 @@ public final class AppSettings: ObservableObject {
         self.defaults = defaults
         self.anisetteServerURL = defaults.string(forKey: OmnistoreConstants.Preferences.anisetteServer)
             ?? OmnistoreConstants.defaultAnisetteServer
-        self.userAgent = defaults.string(forKey: OmnistoreConstants.Preferences.userAgent) ?? ""
-        self.clientInfo = defaults.string(forKey: OmnistoreConstants.Preferences.clientInfo) ?? ""
-    }
-
-    /// Configuration handed to GhostSign; blank fields fall back to Apple's defaults.
-    public var clientConfiguration: AppleClientConfiguration {
-        AppleClientConfiguration(userAgent: userAgent, clientInfo: clientInfo)
     }
 
     /// The Anisette URL if it is a usable HTTPS endpoint.
@@ -68,11 +40,6 @@ public final class AppSettings: ObservableObject {
             return nil
         }
         return url
-    }
-
-    public func resetSpoofingHeaders() {
-        userAgent = ""
-        clientInfo = ""
     }
 }
 #endif
